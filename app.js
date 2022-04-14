@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, Intents } = require('discord.js');
+const { Client, Intents, Message } = require('discord.js');
 const client = new Client({
   intents: [
     Intents.FLAGS.GUILDS,
@@ -9,6 +9,16 @@ const client = new Client({
     Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
   ],
 });
+const mongoose = require('mongoose');
+
+mongoose.connect(process.env.MONGO);
+
+const messageSchema = mongoose.Schema({
+  message: String,
+  time: Number,
+});
+
+const MessageMongo = mongoose.model('message', messageSchema);
 
 const adminChannel = '963035863099535360';
 
@@ -21,6 +31,19 @@ const addLog = (title, message, color) => {
         color: color,
       },
     ],
+  });
+
+  const newMessage = message.replaceAll('`', '');
+
+  const messageMongo = new MessageMongo({
+    message: newMessage,
+    time: new Date().getTime(),
+  });
+
+  messageMongo.save((err) => {
+    if (err) {
+      console.error(err);
+    }
   });
 };
 
