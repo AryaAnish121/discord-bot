@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, Intents, Message } = require('discord.js');
+const { Client, Intents } = require('discord.js');
 const client = new Client({
   intents: [
     Intents.FLAGS.GUILDS,
@@ -14,13 +14,31 @@ const mongoose = require('mongoose');
 mongoose.connect(process.env.MONGO);
 
 const messageSchema = mongoose.Schema({
-  message: String,
-  time: Number,
+  discordId: Number,
+  eventName: String,
+  action: String,
+  createDate: Number,
 });
 
-const MessageMongo = mongoose.model('message', messageSchema);
+const Message = mongoose.model('message', messageSchema);
 
 const adminChannel = '963035863099535360';
+
+// code
+
+const logs = [];
+
+const saveLog = () => {
+  Message.insertMany(logs, (err) => {
+    if (err) {
+      console.error(err);
+    } else {
+      logs.length = 0;
+    }
+  });
+};
+
+setInterval(saveLog, 60 * 1000);
 
 const addLog = (title, message, color) => {
   client.channels.cache.get(adminChannel).send({
@@ -31,19 +49,6 @@ const addLog = (title, message, color) => {
         color: color,
       },
     ],
-  });
-
-  const newMessage = message.replaceAll('`', '');
-
-  const messageMongo = new MessageMongo({
-    message: newMessage,
-    time: new Date().getTime(),
-  });
-
-  messageMongo.save((err) => {
-    if (err) {
-      console.error(err);
-    }
   });
 };
 
@@ -67,6 +72,12 @@ client.on('messageCreate', (message) => {
     '`';
 
   addLog(null, messageToSend, 0x65db86);
+  logs.push({
+    discordId: message.author.id,
+    eventName: 'messageCreate',
+    action: `${message.author.id} typed this message: ${message.content}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('messageDelete', (message) => {
@@ -80,6 +91,12 @@ client.on('messageDelete', (message) => {
     return;
   }
   addLog(null, messageToSend, 0xff8461);
+  logs.push({
+    discordId: message.author.id,
+    eventName: 'messageDelete',
+    action: `${message.author.id} deleted a message which contained: ${message.content}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('messageUpdate', (message, newMessage) => {
@@ -95,6 +112,12 @@ client.on('messageUpdate', (message, newMessage) => {
     return;
   }
   addLog(null, messageToSend, 0x0099ff);
+  logs.push({
+    discordId: message.author.id,
+    eventName: 'messageUpdate',
+    action: `${message.author.id} updated a message from: ${message.content}           to           ${newMessage.content}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('channelCreate', async (channel) => {
@@ -116,6 +139,12 @@ client.on('channelCreate', async (channel) => {
     }>`,
     0x65db86
   );
+  logs.push({
+    discordId: Entry.executor.id,
+    eventName: 'channelCreate',
+    action: `${Entry.executor.id} created a channel named: ${channel.name} (id ${channel.id})`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('channelDelete', async (channel) => {
@@ -138,6 +167,12 @@ client.on('channelDelete', async (channel) => {
       '`',
     0xff8461
   );
+  logs.push({
+    discordId: Entry.executor.id,
+    eventName: 'channelDelete',
+    action: `${Entry.executor.id} deleted a channel named: ${channel.name} (id ${channel.id})`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('guildBanAdd', async (ban) => {
@@ -155,6 +190,12 @@ client.on('guildBanAdd', async (ban) => {
     `<@${ban.user.id}> was banned by <@${Entry.executor.id}>`,
     0xff8461
   );
+  logs.push({
+    discordId: Entry.executor.id,
+    eventName: 'guildBanAdd',
+    action: `${ban.user.id} was banned by ${Entry.executor.id}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('guildBanRemove', async (ban) => {
@@ -172,14 +213,32 @@ client.on('guildBanRemove', async (ban) => {
     `<@${ban.user.id}> was unbanned by <@${Entry.executor.id}>`,
     0x65db86
   );
+  logs.push({
+    discordId: Entry.executor.id,
+    eventName: 'guildBanRemove',
+    action: `${ban.user.id} was unbanned by ${Entry.executor.id}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('guildMemberAdd', async (member) => {
   addLog(null, `<@${member.id}> joined the server!`, 0x65db86);
+  logs.push({
+    discordId: member.id,
+    eventName: 'guildMemberAdd',
+    action: `${member.id} joined the server!`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('guildMemberRemove', async (member) => {
   addLog(null, `<@${member.id}> left the server`, 0xff8461);
+  logs.push({
+    discordId: member.id,
+    eventName: 'guildMemberRemove',
+    action: `${member.id} left the server`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('messageReactionAdd', (reaction, user) => {
@@ -195,6 +254,12 @@ client.on('messageReactionAdd', (reaction, user) => {
       '`',
     0x65db86
   );
+  logs.push({
+    discordId: user.id,
+    eventName: 'messageReactionAdd',
+    action: `${user.id}> reacted with: ${reaction.emoji.name} to a message with id: ${reaction.message.id}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.on('messageReactionRemove', (reaction, user) => {
@@ -210,6 +275,12 @@ client.on('messageReactionRemove', (reaction, user) => {
       '`',
     0x65db86
   );
+  logs.push({
+    discordId: user.id,
+    eventName: 'messageReactionRemove',
+    action: `${user.id}> removed this reaction: ${reaction.emoji.name} from a message which has this id: ${reaction.message.id}`,
+    createDate: new Date().getTime(),
+  });
 });
 
 client.login(process.env.BOT_TOKEN);
